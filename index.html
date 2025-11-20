@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="simple.css" />
+    <script src="papaparse.min.js"></script>
+    <title>DataMerge</title>
+  </head>
+  <body>
+    <main>
+      <h1>DataMerge</h1>
+      <p>
+        Use the button below to upload the folder containing your statistics.
+      </p>
+
+      <input
+        id="fileUpload"
+        name="fileUpload"
+        type="file"
+        webkitdirectory
+        directory
+        multiple
+      />
+      <div id="progressWrapper" style="display: none">
+        <span id="progressStatus">Waiting for upload…</span>
+        <progress id="progressBar" value="0" max="100"></progress>
+      </div>
+    </main>
+    <div class="notice">
+      <h4 style="margin: 0 0 0.5rem 0">FAQ</h4>
+      <details>
+        <summary>
+          <b>Q: Which folder do I upload?</b>
+        </summary>
+        <p>A: Upload the top level folder containing all the statistics.</p>
+        <ul>
+          <li>
+            📁 MyFolder <u><b>⬅ Upload this</b></u>
+          </li>
+          <ul>
+            <li>📁 Alpha_1_Statistics</li>
+            <ul>
+              <li>📄 file1.csv</li>
+              <li>📄 file2.csv</li>
+            </ul>
+            <li>📁 Alpha_2_Statistics</li>
+            <ul>
+              <li>📄 file1.csv</li>
+              <li>📄 file2.csv</li>
+            </ul>
+            <li>📁 Beta_1_Statistics</li>
+            <ul>
+              <li>📄 file1.csv</li>
+              <li>📄 file2.csv</li>
+            </ul>
+          </ul>
+        </ul>
+      </details>
+    </div>
+    <script>
+      const combinedData = new Map();
+
+      function onFileParse(results, file) {
+        // Get the path
+        const path = file.webkitRelativePath;
+        const [_, subfolderName, fileName] = path.split("/");
+
+        // Parse a key from the subfolder for aggregation
+        const regex = /^(.+?)_\d+_Statistics$/;
+        const match = subfolderName.match(regex);
+        if (!match || match.length < 2) {
+          throw new Error(`No match found: ${subfolderName}`);
+        }
+        const testName = match[1];
+
+        // Parse the data
+        const data = results.data.slice(3);
+        const headers = data.shift();
+        const firstHeader = headers[0];
+
+        // Create a key from testName and header
+        const key = `${testName}_${firstHeader.replace(/ /g, "_")}`;
+        if (!combinedData.has(key)) {
+          combinedData.set(key, []);
+        }
+
+        for (const row of data) {
+          row[0] && combinedData.get(key).push([row[0]]);
+        }
+      }
+
+      const folderSelector = document.getElementById("fileUpload");
+      const progressWrapper = document.getElementById("progressWrapper");
+      const progressBar = document.getElementById("progressBar");
+      const progressStatus = document.getElementById("progressStatus");
+
+      function showProgress(totalFiles) {
+        progressWrapper.style.display = "block";
+        progressBar.max = totalFiles || 1;
+        progressBar.value = 0;
+        progressStatus.textContent = `Processing 0 of ${totalFiles} files`;
+      }
+
+      function updateProgress(completed, total) {
+        progressBar.value = completed;
+        progressStatus.textContent = `Processing ${completed} of ${total} files`;
+      }
+
+      function completeProgress() {
+        progressBar.value = progressBar.max;
+        progressStatus.textContent = "All files processed. Downloads ready.";
+      }
+
+      folderSelector.addEventListener("change", async (event) => {
+        combinedData.clear();
+
+        const files = event.target.files;
+        const csvFiles = Array.from(files).filter(
+          (f) => f.type === "text/csv" && !f.name.includes("Overall")
+        );
+
+        const totalFiles = csvFiles.length;
+        showProgress(totalFiles);
+
+        if (!totalFiles) {
+          alert("No CSV files found.");
+          return;
+        }
+
+        let completedFiles = 0;
+
+        const parsePromises = csvFiles.map((file) => {
+          return new Promise((resolve, reject) => {
+            Papa.parse(file, {
+              complete: async (results) => {
+                onFileParse(results, file);
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                completedFiles += 1;
+                updateProgress(completedFiles, totalFiles);
+                resolve(results);
+              },
+              error: (error) => {
+                reject(error);
+              },
+            });
+          });
+        });
+
+        try {
+          await Promise.all(parsePromises);
+
+          combinedData.forEach((values, key) => {
+            const data = [[key], ...values];
+            const csv = Papa.unparse(data);
+
+            const blob = new Blob([csv], {
+              type: "text/csv;charset=utf-8;",
+            });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${key}.csv`;
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            URL.revokeObjectURL(url);
+          });
+          completeProgress();
+        } catch (error) {
+          alert("Error parsing files");
+
+          console.error(error);
+        }
+      });
+    </script>
+  </body>
+</html>

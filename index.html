@@ -90,6 +90,7 @@
         }
       }
 
+      // Progress bar
       const folderSelector = document.getElementById("fileUpload");
       const progressWrapper = document.getElementById("progressWrapper");
       const progressBar = document.getElementById("progressBar");
@@ -135,9 +136,10 @@
             Papa.parse(file, {
               complete: async (results) => {
                 onFileParse(results, file);
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+
                 completedFiles += 1;
                 updateProgress(completedFiles, totalFiles);
+
                 resolve(results);
               },
               error: (error) => {

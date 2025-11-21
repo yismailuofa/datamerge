@@ -13,23 +13,27 @@
       <p>
         Use the button below to upload the folder containing your statistics.
       </p>
-
-      <input
-        id="fileUpload"
-        name="fileUpload"
-        type="file"
-        webkitdirectory
-        directory
-        multiple
-      />
-      <div id="progressWrapper" style="display: none">
-        <span id="progressStatus">Waiting for upload…</span>
-        <progress id="progressBar" value="0" max="100"></progress>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        "
+      >
+        <input
+          id="fileUpload"
+          name="fileUpload"
+          type="file"
+          webkitdirectory
+          directory
+          multiple
+        />
+        <label for="fileUpload" id="progress"></label>
       </div>
     </main>
     <div class="notice">
       <h4 style="margin: 0 0 0.5rem 0">FAQ</h4>
-      <details>
+      <details open>
         <summary>
           <b>Q: Which folder do I upload?</b>
         </summary>
@@ -60,6 +64,7 @@
     </div>
     <script>
       const combinedData = new Map();
+      let maxLength = 0;
 
       function onFileParse(results, file) {
         // Get the path
@@ -87,97 +92,88 @@
 
         for (const row of data) {
           row[0] && combinedData.get(key).push([row[0]]);
+          maxLength = Math.max(maxLength, combinedData.get(key).length);
         }
       }
 
-      // Progress bar
-      const folderSelector = document.getElementById("fileUpload");
-      const progressWrapper = document.getElementById("progressWrapper");
-      const progressBar = document.getElementById("progressBar");
-      const progressStatus = document.getElementById("progressStatus");
-
-      function showProgress(totalFiles) {
-        progressWrapper.style.display = "block";
-        progressBar.max = totalFiles || 1;
-        progressBar.value = 0;
-        progressStatus.textContent = `Processing 0 of ${totalFiles} files`;
+      function setMessage(message) {
+        document.getElementById("progress").textContent = message;
       }
 
-      function updateProgress(completed, total) {
-        progressBar.value = completed;
-        progressStatus.textContent = `Processing ${completed} of ${total} files`;
-      }
+      document
+        .getElementById("fileUpload")
+        .addEventListener("change", async (event) => {
+          const files = event.target.files;
+          const csvFiles = Array.from(files).filter(
+            (f) => f.type === "text/csv" && !f.name.includes("Overall")
+          );
+          const totalFiles = csvFiles.length;
 
-      function completeProgress() {
-        progressBar.value = progressBar.max;
-        progressStatus.textContent = "All files processed. Downloads ready.";
-      }
+          if (!totalFiles) {
+            alert("No CSV files found.");
+            return;
+          }
 
-      folderSelector.addEventListener("change", async (event) => {
-        combinedData.clear();
+          setMessage("Parsing…");
+          let completedFiles = 0;
 
-        const files = event.target.files;
-        const csvFiles = Array.from(files).filter(
-          (f) => f.type === "text/csv" && !f.name.includes("Overall")
-        );
+          const parsePromises = csvFiles.map((file) => {
+            return new Promise((resolve, reject) => {
+              Papa.parse(file, {
+                complete: async (results) => {
+                  onFileParse(results, file);
 
-        const totalFiles = csvFiles.length;
-        showProgress(totalFiles);
+                  setMessage(`Parsed ${++completedFiles}/${totalFiles} files`);
 
-        if (!totalFiles) {
-          alert("No CSV files found.");
-          return;
-        }
-
-        let completedFiles = 0;
-
-        const parsePromises = csvFiles.map((file) => {
-          return new Promise((resolve, reject) => {
-            Papa.parse(file, {
-              complete: async (results) => {
-                onFileParse(results, file);
-
-                completedFiles += 1;
-                updateProgress(completedFiles, totalFiles);
-
-                resolve(results);
-              },
-              error: (error) => {
-                reject(error);
-              },
+                  resolve(results);
+                },
+                error: (error) => {
+                  reject(error);
+                },
+              });
             });
           });
-        });
 
-        try {
-          await Promise.all(parsePromises);
+          try {
+            await Promise.all(parsePromises);
 
-          combinedData.forEach((values, key) => {
-            const data = [[key], ...values];
-            const csv = Papa.unparse(data);
+            const csvData = [];
+
+            for (let i = 0; i < maxLength; i++) {
+              const row = {};
+
+              for (const [key, values] of combinedData.entries()) {
+                values[i] && (row[key] = values[i]);
+              }
+
+              csvData.push(row);
+            }
+
+            const csv = Papa.unparse(csvData);
 
             const blob = new Blob([csv], {
               type: "text/csv;charset=utf-8;",
             });
+
             const url = URL.createObjectURL(blob);
 
             const link = document.createElement("a");
             link.href = url;
-            link.download = `${key}.csv`;
+            link.download = `merged_data_${new Date().toISOString()}.csv`;
 
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
             URL.revokeObjectURL(url);
-          });
-          completeProgress();
-        } catch (error) {
-          alert("Error parsing files");
 
-          console.error(error);
-        }
-      });
+            setMessage("Files parsed successfully ✓  ");
+          } catch (error) {
+            alert("Error parsing files");
+
+            console.error(error);
+          }
+        });
     </script>
   </body>
 </html>

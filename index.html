@@ -69,26 +69,17 @@
       function onFileParse(results, file) {
         // Get the path
         const path = file.webkitRelativePath;
-        const [_, subfolderName, fileName] = path.split("/");
+        const fileName = path.split("/").at(-1);
 
-        // Parse a key from the subfolder for aggregation
-        const regex = /^(.+?)_\d+_Statistics$/;
-        const match = subfolderName.match(regex);
-        if (!match || match.length < 2) {
-          throw new Error(`No match found: ${subfolderName}`);
-        }
-        const testName = match[1];
+        // Parse a key from the filename for aggregation
+        const key = fileName.replace(/_\d+_/g, "_").replace(".csv", "");
 
-        // Parse the data
-        const data = results.data.slice(3);
-        const headers = data.shift();
-        const firstHeader = headers[0];
-
-        // Create a key from testName and header
-        const key = `${testName}_${firstHeader.replace(/ /g, "_")}`;
         if (!combinedData.has(key)) {
           combinedData.set(key, []);
         }
+
+        // Skip the headers
+        const data = results.data.slice(4);
 
         for (const row of data) {
           row[0] && combinedData.get(key).push([row[0]]);

@@ -129,11 +129,13 @@
             await Promise.all(parsePromises);
 
             const csvData = [];
+            const sortedKeys = Array.from(combinedData.keys()).sort();
 
             for (let i = 0; i < maxLength; i++) {
               const row = {};
 
-              for (const [key, values] of combinedData.entries()) {
+              for (const key of sortedKeys) {
+                const values = combinedData.get(key);
                 values[i] && (row[key] = values[i]);
               }
 

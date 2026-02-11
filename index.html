@@ -72,8 +72,7 @@
         const fileName = path.split("/").at(-1);
 
         // Parse a key from the filename for aggregation
-        const key = fileName.replace(/_?\d+_/g, "_").replace(".csv", "");
-        console.log(key);
+        const key = fileName.replace(/_?\d+_/, "_").replace(".csv", "");
 
         if (!combinedData.has(key)) {
           combinedData.set(key, []);
@@ -140,6 +139,9 @@
 
               csvData.push(row);
             }
+
+            // log all keys for debugging
+            console.log(Array.from(combinedData.keys()));
 
             const csv = Papa.unparse(csvData);
 

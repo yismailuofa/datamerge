@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -72,7 +72,8 @@
         const fileName = path.split("/").at(-1);
 
         // Parse a key from the filename for aggregation
-        const key = fileName.replace(/_\d+_/g, "_").replace(".csv", "");
+        const key = fileName.replace(/_?\d+_/g, "_").replace(".csv", "");
+        console.log(key);
 
         if (!combinedData.has(key)) {
           combinedData.set(key, []);
@@ -96,7 +97,7 @@
         .addEventListener("change", async (event) => {
           const files = event.target.files;
           const csvFiles = Array.from(files).filter(
-            (f) => f.type === "text/csv" && !f.name.includes("Overall")
+            (f) => f.type === "text/csv" && !f.name.includes("Overall"),
           );
           const totalFiles = csvFiles.length;
 
